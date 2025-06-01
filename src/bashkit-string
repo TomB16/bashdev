@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Guard against multiple inclusion
+
+[[ -n "${__BASHKIT_STRING_SH__}" ]] && return ; readonly __BASHKIT_STRING_SH__=1
+
+
+# strip quotes
+
+string::strip_quotes() {
+    local input="$1"
+    local first="${input:0:1}"
+    local last="${input: -1}"
+
+    case "$first$last" in
+        "''" | "\"\"" | "``" | "[]" | "{}" | "()" | "<>")
+            echo "${input:1:-1}"
+            ;;
+        *)
+            echo "$input"
+            ;;
+    esac
+}
+
+

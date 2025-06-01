@@ -1,0 +1,176 @@
+#!/bin/bash
+
+
+# Function to get a single CPU frequency sample from the first CPU core found (in kHz)
+
+cpu::frequency_get() {
+    local cpuinfo_file="/proc/cpuinfo"
+    if [[ -f $cpuinfo_file ]]; then
+        # Average cpu MHz across all cores, converted to kHz (integer)
+        awk '/cpu MHz/ { total += $4; count++ } END { if(count) printf "%d\n", (total/count); else print 0 }' "$cpuinfo_file"
+    else
+        echo 0
+    fi
+}
+
+# Start the CPU frequency watcher in the background
+
+cpu::frequency_watcher_start() {
+
+	# parameters
+
+    local INTERVAL="${1:-5}"  # Default to 5 seconds
+	local SEM="${2:-/tmp/cpu.freq.sem}" 
+	local RESULT_FILE="${3:-/tmp/cpu.freq.result}" 
+
+
+    # Make sure the stop file doesn't exist
+
+	rm -f "$SEM"
+
+    # Start the watcher in the background
+
+    bashkit-cpu-watcher-frequency "$INTERVAL" "$SEM" "$RESULT_FILE" &
+    local pid=$!
+
+}
+
+
+# Signal the CPU frequency watcher to stop
+cpu::frequency_watcher_stop() {
+
+	# parameters
+
+	local SEM="${1:-/tmp/cpu.freq.sem}" 
+	local RESULT_FILE="${2:-/tmp/cpu.freq.result}" 
+
+
+    # Signal the watcher to stop by creating the stop file
+
+    touch "$SEM"
+
+
+	# wait for result file
+
+	sleep_count=10
+	while [[ sleep_count -gt 0 ]]; do
+		if [[ -f "$RESULT_FILE" ]]; then sleep_count=0;		fi
+		sleep 1
+		sleep_count=$((sleep_count - 1))	
+	done
+
+
+	# return result
+
+	cat "$RESULT_FILE"
+
+}
+
+
+
+
+
+
+
+# Function to get a single CPU temperature sample (°C)
+
+cpu::temperature_get() {
+    local hwmon_dir temp_file temp_val
+
+    for hwmon_dir in /sys/class/hwmon/hwmon*; do
+        if [[ -f "$hwmon_dir/name" ]] && [[ "$(cat "$hwmon_dir/name")" == "k10temp" ]]; then
+            temp_file="$hwmon_dir/temp1_input"
+            if [[ -f $temp_file ]]; then
+                temp_val=$(cat "$temp_file")
+                # Add 500 before dividing to round to nearest degree
+                echo $(((temp_val + 500) / 1000))
+                return
+            fi
+        fi
+    done
+
+    echo 0
+}
+
+
+# launch the cpu temp watcher
+
+cpu::temperature_watcher_start() {
+
+	# parameters
+
+    local INTERVAL="${1:-5}"  # Default to 5 seconds
+	local SEM="${2:-/tmp/cpu.temp.sem}" 
+	local RESULT_FILE="${3:-/tmp/cpu.temp.result}" 
+
+
+    # Make sure the stop file doesn't exist
+
+	rm -f "$SEM"
+
+
+    # Start the watcher in the background
+
+    bashkit-cpu-watcher-temperature "$INTERVAL" "$SEM" "$RESULT_FILE" &
+    local pid=$!
+
+}
+
+
+# Signal the CPU frequency watcher to stop
+
+cpu::temperature_watcher_stop() {
+
+	# parameters
+
+	local SEM="${1:-/tmp/cpu.temp.sem}" 
+	local RESULT_FILE="${2:-/tmp/cpu.temp.result}" 
+
+
+    # Signal the watcher to stop by creating the stop file
+
+    touch "$SEM"
+
+
+	# wait for result file
+
+	sleep_count=10
+	while [[ sleep_count -gt 0 ]]; do
+		if [[ -f "$RESULT_FILE" ]]; then sleep_count=0;		fi
+		sleep 1
+		sleep_count=$((sleep_count - 1))	
+	done
+
+
+	# return result
+
+	cat "$RESULT_FILE"
+
+}
+
+
+
+
+
+
+
+# Function to get a single CPU temperature sample (°C)
+
+cpu::get_temperature() {
+    local hwmon_dir temp_file temp_val
+
+    for hwmon_dir in /sys/class/hwmon/hwmon*; do
+        if [[ -f "$hwmon_dir/name" ]] && [[ "$(cat "$hwmon_dir/name")" == "k10temp" ]]; then
+            temp_file="$hwmon_dir/temp1_input"
+            if [[ -f $temp_file ]]; then
+                temp_val=$(cat "$temp_file")
+                # Add 500 before dividing to round to nearest degree
+                echo $(((temp_val + 500) / 1000))
+                return
+            fi
+        fi
+    done
+
+    echo 0
+}
+

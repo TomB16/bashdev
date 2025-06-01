@@ -1,0 +1,71 @@
+#!/bin/bash
+
+# bashkit-cpu-watcher-temperature
+# Usage: bashkit-cpu-watcher-remperature [interval_seconds] [semaphore_file] [result_file]
+# Monitors CPU temperature and outputs the average when stopped by touching /tmp/bashkit.cpu.sem
+
+source bashkit-cpu
+
+
+# parameters
+
+WATCHER_INTERVAL="${1:-5}"  # Default to 5 seconds
+WATCHER_SEM="${2:-/tmp/bashkit.cpu.temp.sem}" 
+WATCHER_RESULT_FILE="${3:-/tmp/cpu.temp.result}" 
+
+
+# running totals
+
+SAMPLES=0
+SAMPLES_MAX=$(( (4 * 60 * 60) / WATCHER_INTERVAL ))		# four hour limit on taking samples to prevent runaway process from running forever
+TEMP_TOTAL=0
+
+
+# debug
+
+#echo "$WATCHER_INTERVAL" >> /tmp/log
+#echo "$WATCHER_SEM" >> /tmp/log
+#echo "$WATCHER_RESULT_FILE" >> /tmp/log
+
+
+# sample loop
+
+while [[ ! -f "$WATCHER_SEM" ]]; do
+
+    # read the current CPU frequency in MHz
+
+    TEMP=$(cpu::temperature_get)
+
+
+	# running totals
+
+    TEMP_TOTAL=$(echo "$TEMP_TOTAL + $TEMP" | bc -l)
+    SAMPLES=$((SAMPLES + 1))
+
+
+	# time limit
+
+	if [ "$SAMPLES" -ge "$SAMPLES_MAX" ]; then 	touch "$WATCHER_SEM"; 	fi
+
+
+	# interval delay
+
+    sleep "$WATCHER_INTERVAL"
+
+done
+
+
+# save result for hand-off
+
+if (( SAMPLES > 0 )); then
+    TEMP_AVE=$(echo "$TEMP_TOTAL / $SAMPLES" | bc -l)
+	printf "%.2f" "$TEMP_AVE" > "$WATCHER_RESULT_FILE"
+else
+    echo "Temp not collected." >> $WATCHER_RESULT_FILE
+fi
+
+
+# Optionally clean up the stop file
+
+rm -f "$WATCHER_SEM"
+

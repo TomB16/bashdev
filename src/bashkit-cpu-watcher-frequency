@@ -1,0 +1,71 @@
+#!/bin/bash
+
+# bashkit-cpu-watcher-frequency
+# Usage: bashkit-cpu-watcher-frequency [interval_seconds] [semaphore_file] [result_file]
+# Monitors CPU frequency and outputs the average when stopped by touching /tmp/bashkit.cpu.sem
+
+source bashkit-cpu
+
+
+# parameters
+
+WATCHER_INTERVAL="${1:-5}"  # Default to 5 seconds
+WATCHER_SEM="${2:-/tmp/bashkit.cpu.freq.sem}" 
+WATCHER_RESULT_FILE="${3:-/tmp/cpu.freq.result}" 
+
+
+# running totals
+
+SAMPLES=0
+SAMPLES_MAX=$(( (4 * 60 * 60) / WATCHER_INTERVAL ))		# four hour limit on taking samples to prevent runaway process from running forever
+FREQ_TOTAL=0
+
+
+# debug
+
+#echo "$WATCHER_INTERVAL" >> /tmp/log
+#echo "$WATCHER_SEM" >> /tmp/log
+#echo "$WATCHER_RESULT_FILE" >> /tmp/log
+
+
+# sample loop
+
+while [[ ! -f "$WATCHER_SEM" ]]; do
+
+    # read the current CPU frequency in MHz
+
+    FREQ_MHZ=$(cpu::frequency_get)
+
+
+	# running totals
+
+    FREQ_TOTAL=$(echo "$FREQ_TOTAL + $FREQ_MHZ" | bc -l)
+    SAMPLES=$((SAMPLES + 1))
+
+
+	# time limit
+
+	if [ "$SAMPLES" -ge "$SAMPLES_MAX" ]; then 	touch "$WATCHER_SEM"; 	fi
+
+
+	# interval delay
+
+    sleep "$WATCHER_INTERVAL"
+
+done
+
+
+# save result for hand-off
+
+if (( SAMPLES > 0 )); then
+    FREQ_AVE=$(echo "$FREQ_TOTAL / $SAMPLES" | bc -l)
+	printf "%.2f" "$FREQ_AVE" > "$WATCHER_RESULT_FILE"
+else
+    echo "FREQ not collected." >> $WATCHER_RESULT_FILE
+fi
+
+
+# Optionally clean up the stop file
+
+rm -f "$WATCHER_SEM"
+
