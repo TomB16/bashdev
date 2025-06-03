@@ -1,0 +1,39 @@
+#!/bin/bash
+
+source bashkit-cpu
+
+
+echo "info: CPU detected - $(cpu::model_get)"
+
+echo "info: CPU frequency - $(cpu::frequency_get)"
+
+echo "info: CPU temperature - $(cpu::temperature_get)"
+
+
+
+# monitor CPU frequency
+#
+# pass unique semaphore file and result file if there is any chance of multiple scripts using this facility at the same time.
+
+cpu::frequency_watcher_start 1
+
+# do some heavy CPU work
+
+sleep 5s
+
+echo "info: CPU average temperature - $(cpu::frequency_watcher_stop)"
+
+
+
+# monitor CPU temp
+#
+# pass unique semaphore file and result file if there is any chance of multiple scripts using this facility at the same time.
+
+cpu::temperature_watcher_start 1
+
+# do some stuff
+
+sleep 5s
+
+echo "info: CPU average temperature - $(cpu::temperature_watcher_stop)"
+

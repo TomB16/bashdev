@@ -1,0 +1,7 @@
+#!/bin/bash
+
+source bashkit-string
+
+
+echo "info: CPU detected - $(string::strip_quotes "[this is a test]" )"
+

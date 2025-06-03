@@ -1,0 +1,13 @@
+#!/bin/bash
+
+source ./bashkit-file
+
+DEBUG=true
+
+FILES_DIR="/prime25/media/Library Returns"
+FILES_AGE=${1:-360}
+
+
+echo "info: clean old files older than $FILES_AGE from $FILES_DIR"
+file::clean_old_files "$FILES_DIR" "$FILES_AGE"
+

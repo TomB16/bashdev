@@ -1,6 +1,19 @@
 #!/bin/bash
 
 
+# get cpu model
+
+cpu::model_get() {
+
+	cpu_model=$(grep -m1 "model name" /proc/cpuinfo | cut -d ':' -f2 | xargs)
+
+	echo "$cpu_model"
+
+}
+
+
+
+
 # Function to get a single CPU frequency sample from the first CPU core found (in kHz)
 
 cpu::frequency_get() {
@@ -12,6 +25,7 @@ cpu::frequency_get() {
         echo 0
     fi
 }
+
 
 # Start the CPU frequency watcher in the background
 
@@ -65,11 +79,6 @@ cpu::frequency_watcher_stop() {
 	cat "$RESULT_FILE"
 
 }
-
-
-
-
-
 
 
 # Function to get a single CPU temperature sample (°C)
@@ -147,11 +156,6 @@ cpu::temperature_watcher_stop() {
 	cat "$RESULT_FILE"
 
 }
-
-
-
-
-
 
 
 # Function to get a single CPU temperature sample (°C)

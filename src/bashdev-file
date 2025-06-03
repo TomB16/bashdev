@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Guard against multiple inclusion
+
+[[ -n "${__BASHKIT_FILE_SH__}" ]] && return ; readonly __BASHKIT_FILE_SH__=1
+
+
+# clean old files
+
+file::clean_old_files() {
+
+    local path="$1"
+    local age="${2:-360}"
+
+    if [[ -z "$path" ]]; then
+        echo "Usage: file::clean_old_files <path> [age in days]" >&2
+        return 1
+    fi
+
+    if [[ ! -d "$path" ]]; then
+        echo "error: '$path' is not a valid directory." >&2
+        return 2
+    fi
+
+    [ "$DEBUG" ] && echo "debug: cleaning files older than $age days in $path"
+    find "$path" -type f -mtime "+$age" -print -delete
+}
