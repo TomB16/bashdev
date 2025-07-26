@@ -21,14 +21,14 @@
 #
 
 
-source bashdev-cpu
+source bashdev-gpu
 
 
 # parameters
 
-WATCHER_INTERVAL="${1:-5}"  # Default to 5 seconds
-WATCHER_SEM="${2:-/tmp/bashdev.cpu.temp.sem}"
-WATCHER_RESULT_FILE="${3:-/tmp/cpu.temp.result}" 
+WATCHER_INTERVAL="${1:-10}"  # Default to 10 seconds
+WATCHER_SEM="${2:-/tmp/bashdev.gpu.temp.sem}"
+WATCHER_RESULT_FILE="${3:-/tmp/gpu.temp.result}"
 
 
 # running totals
@@ -51,7 +51,7 @@ while [[ ! -f "$WATCHER_SEM" ]]; do
 
     # read the current CPU frequency in MHz
 
-    TEMP=$(cpu::temperatureGet)
+    TEMP=$(gpu::temperatureGet)
 
 
 	# running totals

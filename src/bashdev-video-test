@@ -21,28 +21,15 @@
 #
 
 
-# Guard against multiple inclusion
-
-[[ -n "${__BASHDEV_FILE_SH__}" ]] && return ; readonly __BASHDEV_FILE_SH__=1
+source ./bashdev-video
 
 
-# clean old files
+video::ffmpegIsInstalled && RESULT=true || RESULT=false
+echo "info: ffmpeg installed        $RESULT"
 
-file::cleanOldFiles() {
+#video::ffmpegVersionGet
 
-    local path="$1"
-    local age="${2:-360}"
+echo "info  ffmpeg version          $( video::ffmpegVersionGet )"
 
-    if [[ -z "$path" ]]; then
-        echo "Usage: file::clean_old_files <path> [age in days]" >&2
-        return 1
-    fi
+echo "info: x265 CPU encode support $( video::supportffmpegCPUEncodeHEVC && echo true || echo false )"
 
-    if [[ ! -d "$path" ]]; then
-        echo "error: '$path' is not a valid directory." >&2
-        return 2
-    fi
-
-    [ "$DEBUG" ] && echo "debug: cleaning files older than $age days in $path"
-    find "$path" -type f -mtime "+$age" -print -delete
-}

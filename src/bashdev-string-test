@@ -1,39 +1,53 @@
 #!/bin/bash
 
-source bashkit-cpu
-
-
-echo "info: CPU detected - $(cpu::model_get)"
-
-echo "info: CPU frequency - $(cpu::frequency_get)"
-
-echo "info: CPU temperature - $(cpu::temperature_get)"
-
-
-
-# monitor CPU frequency
 #
-# pass unique semaphore file and result file if there is any chance of multiple scripts using this facility at the same time.
+# bashdev - BASH general purpose libraries
+# Copyright (C) 2025 Tom Brown
+#
+# This file is part of bashdev
+#
+# bashdev is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# bashdev is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with bashdev.  If not, see <https://www.gnu.org/licenses/>.
+#
 
-cpu::frequency_watcher_start 1
 
-# do some heavy CPU work
+source bashdev-string
 
+
+VAR="123";          string::isNumeric "$VAR" && RESULT=true || RESULT=false
+echo "info:  string [$VAR] is numeric  $RESULT"
+
+VAR="a23";          string::isNumeric "$VAR" && RESULT=true || RESULT=false
+echo "info:  string [$VAR] is numeric  $RESULT"
+
+# Test cases for string::strip_quotes ---
+
+echo "info: testing string::strip_quotes"
+for str in "'hello'" '"world"' "\`test\`" "[brackets]" "{braces}" "(parentheses)" "<angle>" "noquotes"; do
+    stripped=$(string::strip_quotes "$str")
+    echo "info:  input: $str -> Stripped: $stripped"
+done
+echo
+
+# test for string::seconds2hhmmss
+
+SECONDS=0
+
+echo "info: testing string::seconds2hhmmss"
+echo "info: 5 second dalay"
 sleep 5s
 
-echo "info: CPU average temperature - $(cpu::frequency_watcher_stop)"
+echo "info: seconds - $SECONDS " $(string::seconds2hhmmss $SECONDS)
 
 
-
-# monitor CPU temp
-#
-# pass unique semaphore file and result file if there is any chance of multiple scripts using this facility at the same time.
-
-cpu::temperature_watcher_start 1
-
-# do some stuff
-
-sleep 5s
-
-echo "info: CPU average temperature - $(cpu::temperature_watcher_stop)"
 

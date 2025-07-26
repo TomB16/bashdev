@@ -21,28 +21,30 @@
 #
 
 
-# Guard against multiple inclusion
-
-[[ -n "${__BASHDEV_FILE_SH__}" ]] && return ; readonly __BASHDEV_FILE_SH__=1
+source ./bashdev-gpu
 
 
-# clean old files
+echo "info: GPU brand        $(gpu::brandGet)"
+echo "info: GPU model        $(gpu::modelGet)"
 
-file::cleanOldFiles() {
+echo "info: GPU frequency    $(gpu::frequencyGet)"
+echo "info: GPU temperature  $(gpu::temperatureGet)"
 
-    local path="$1"
-    local age="${2:-360}"
+echo "info: GPU HEVC encode  $( gpu::supportEncodeHEVC && echo true || echo false )"
 
-    if [[ -z "$path" ]]; then
-        echo "Usage: file::clean_old_files <path> [age in days]" >&2
-        return 1
-    fi
 
-    if [[ ! -d "$path" ]]; then
-        echo "error: '$path' is not a valid directory." >&2
-        return 2
-    fi
+# monitor frequency and return average
 
-    [ "$DEBUG" ] && echo "debug: cleaning files older than $age days in $path"
-    find "$path" -type f -mtime "+$age" -print -delete
-}
+DURATION=8
+echo "starting frequency monitor $DURATION seconds ..."
+echo "starting temperature monitor $DURATION seconds ..."
+
+gpu::frequencyWatcherStart 2
+gpu::temperatureWatcherStart 2
+
+sleep "$DURATION"
+
+echo "info:  Average frequency $(gpu::frequencyWatcherStop)"
+echo "info:  Average temperature $(gpu::temperatureWatcherStop)"
+
+

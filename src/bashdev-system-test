@@ -21,28 +21,17 @@
 #
 
 
-# Guard against multiple inclusion
-
-[[ -n "${__BASHDEV_FILE_SH__}" ]] && return ; readonly __BASHDEV_FILE_SH__=1
+source ./bashdev-system
 
 
-# clean old files
+echo "info: ffmpeg installed        $(system::isInstalled ffmpeg && echo true || echo false)"
 
-file::cleanOldFiles() {
+system::isInstalled silly && RESULT=true || RESULT=false
+echo "info: silly installed         $RESULT"
 
-    local path="$1"
-    local age="${2:-360}"
+echo
+system::notifyInstalled ffmpeg  || echo "         ffmpeg is important"
+system::notifyInstalled silly   || echo "         this is a silly app"
 
-    if [[ -z "$path" ]]; then
-        echo "Usage: file::clean_old_files <path> [age in days]" >&2
-        return 1
-    fi
-
-    if [[ ! -d "$path" ]]; then
-        echo "error: '$path' is not a valid directory." >&2
-        return 2
-    fi
-
-    [ "$DEBUG" ] && echo "debug: cleaning files older than $age days in $path"
-    find "$path" -type f -mtime "+$age" -print -delete
-}
+echo
+system::notifyMultipleInstalled ffmpeg silly

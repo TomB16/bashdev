@@ -23,44 +23,24 @@
 
 # Guard against multiple inclusion
 
-[[ -n "${__BASHDEV_STRING_SH__}" ]] && return ; readonly __BASHDEV_STRING_SH__=1
+[[ -n "${__BASHDEV_SYSTEM_SH__}" ]] && return ; readonly __BASHDEV_SYSTEM_SH__=1
 
 
-# strip quotes
+system::isInstalled()     { command -v "$1" >/dev/null 2>&1; }
 
-string::strip_quotes() {
-    local input="$1"
-    local first="${input:0:1}"
-    local last="${input: -1}"
+system::notifyInstalled() {
 
-    case "$first$last" in
-        "''" | "\"\"" | "``" | "[]" | "{}" | "()" | "<>")
-            echo "${input:1:-1}"
-            ;;
-        *)
-            echo "$input"
-            ;;
-    esac
-}
+    local RESULT=0
 
+    if system::isInstalled "$1"; then
+      echo "info:  $1 is installed"
 
-string::seconds2hhmmss() {
-    local total_seconds=$1
-    local hours=$((total_seconds / 3600))
-    local minutes=$(((total_seconds % 3600) / 60))
-    local seconds=$((total_seconds % 60))
-    printf "%02d:%02d:%02d\n" "$hours" "$minutes" "$seconds"
-}
-
-
-string::isNumeric() {
-
-    local VAR="$1"
-
-    if [[ "$VAR" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then RESULT=0
-    else                                           RESULT=1
+    else
+      RESULT=$?
+      echo "warning: $1 is not installed"
     fi
-
 
     return $RESULT;
 }
+
+system::notifyMultipleInstalled() { for util in $@; do system::notifyInstalled "$util"; done }

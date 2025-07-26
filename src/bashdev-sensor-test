@@ -21,28 +21,22 @@
 #
 
 
-# Guard against multiple inclusion
+source bashdev-sensor
 
-[[ -n "${__BASHDEV_FILE_SH__}" ]] && return ; readonly __BASHDEV_FILE_SH__=1
+sensor::envTempSensorPresent && RESULT=true || RESULT=false
+echo "info: env temp sensor detect    $RESULT"
+echo "info: environment temperature   $(sensor::envTempGet)"
 
 
-# clean old files
+# monitor temperature return average
 
-file::cleanOldFiles() {
+DURATION=15
+echo "starting temperature monitor $DURATION seconds ..."
 
-    local path="$1"
-    local age="${2:-360}"
+sensor::envTempWatcherStart 5
 
-    if [[ -z "$path" ]]; then
-        echo "Usage: file::clean_old_files <path> [age in days]" >&2
-        return 1
-    fi
+sleep "$DURATION"
 
-    if [[ ! -d "$path" ]]; then
-        echo "error: '$path' is not a valid directory." >&2
-        return 2
-    fi
+echo "Average temperature $(sensor::envTempWatcherStop)"
 
-    [ "$DEBUG" ] && echo "debug: cleaning files older than $age days in $path"
-    find "$path" -type f -mtime "+$age" -print -delete
-}
+

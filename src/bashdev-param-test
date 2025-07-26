@@ -1,0 +1,93 @@
+#!/bin/bash
+
+#
+# bashdev - BASH general purpose libraries
+# Copyright (C) 2025 Tom Brown
+#
+# This file is part of bashdev
+#
+# bashdev is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# bashdev is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with bashdev.  If not, see <https://www.gnu.org/licenses/>.
+#
+
+
+source ./bashdev-app
+
+APP_NAME=$(basename "$0")
+APP_VERSION="0.0.1"
+APP_AUTHOR="Tom Brown"
+APP_YEAR="2025"
+APP_LICENSE="MIT"
+APP_DESC="bashdev-app library test bed and sample code"
+
+app::masthead "$APP_NAME" "$APP_VERSION" "$APP_AUTHOR" "$APP_YEAR" "$APP_LICENSE" "$APP_DESC"
+
+DEBUG=false
+
+# process lock
+
+app::processLock $(basename "$0")
+
+
+# handle parameters
+
+source ./bashdev-param
+
+# Define parameters
+param::add -n "preflight" -d "preflight checks" -r false -t flag -s p -l preflight
+param::add -n "input" -d "input file" -r true -t string -s i -l input
+
+# Parse arguments
+param::parse "$@"
+
+# Access values
+echo "Preflight: $(param::get preflight)"
+echo "Input: $(param::get input)"
+echo "Positional: ${__bashdev_positional_params[*]}"
+
+#echo "info:  preflight = $(       param::get preflight )"
+#echo "info:: positional args = $( param::getPositional )"
+
+# release the lock on and remove lock file the way out
+
+app::processUnlock
+
+
+
+###################################################
+# Example usage (comment out in actual library)
+###################################################
+
+# # Define parameters
+# add_param -n "input" -d "Input file path" -r true -t string -s i -l input
+# add_param -n "output" -d "Output directory" -t string -s o -l output -D "./out"
+# add_param -n "verbose" -d "Enable verbose output" -t flag -s v -l verbose
+# add_param -n "count" -d "Number of items to process" -t int -s c -l count -D 10
+# add_param -n "force" -d "Force operation" -t bool -s f -l force -D false
+
+# # Parse parameters
+# parse_params "$@"
+
+# # Access parameter values
+# input_file=$(get_param "input")
+# output_dir=$(get_param "output")
+# verbose=$(get_param "verbose")
+# count=$(get_param "count")
+# force=$(get_param "force")
+
+# echo "Input: $input_file"
+# echo "Output: $output_dir"
+# echo "Verbose: $verbose"
+# echo "Count: $count"
+# echo "Force: $force"
+# echo "Positional: $(get_positional_params)"

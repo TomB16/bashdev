@@ -1,0 +1,134 @@
+#!/bin/bash
+
+#
+# bashdev - BASH general purpose libraries
+# Copyright (C) 2025 Tom Brown
+#
+# This file is part of bashdev
+#
+# bashdev is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# bashdev is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with bashdev.  If not, see <https://www.gnu.org/licenses/>.
+#
+
+
+# Guard against multiple inclusion
+
+[[ -n "${__BASHDEV_SENSOR_SH__}" ]] && return ; readonly __BASHDEV_SENSOR_SH__=1
+
+source bashdev-string
+
+
+# get environmental temp
+
+sensor::envTempGet() {
+
+	#local ENV_TEMP=$(temperclone -t -c -1.21)
+	local ENV_TEMP=$(temperclone -t -c -4.21)
+	if ! string::isNumeric "$ENV_TEMP"; then ENV_TEMP="N/A";		fi
+
+
+	echo "$ENV_TEMP"
+
+}
+
+
+# get environmental temp
+
+sensor::envTempSensorPresent() {
+
+	local RESULT=1
+
+	if command -v temperclone &>/dev/null; then
+        output=$( temperclone -t -c -1.21 2>/dev/null )
+        if string::isNumeric "$output"; then
+            RESULT=0
+		#else
+			#echo "info:  no environmental temperature probe found"
+		fi
+    fi
+
+
+	return "$RESULT"
+
+}
+
+
+# Start the CPU frequency watcher in the background
+
+sensor::envTempWatcherStart() {
+
+	# parameters
+
+    local INTERVAL="${1:-60}"  # Default to 60 seconds
+	local SEM="${2:-/tmp/sensor.env-temp.sem}"
+	local RESULT_FILE="${3:-/tmp/sensor.env-temp.result}"
+
+
+    # Make sure the stop file doesn't exist
+
+	[[ -f "$SEM" ]] && rm -f "$SEM"
+
+
+    # Start the watcher in the background
+
+    if sensor::envTempSensorPresent; then
+		bashdev-sensor-watcher-env-temp "$INTERVAL" "$SEM" "$RESULT_FILE" &
+		local PID=$!
+	fi
+
+}
+
+
+# Signal the CPU frequency watcher to stop
+
+sensor::envTempWatcherStop() {
+
+	# parameters
+
+	local SEM="${1:-/tmp/sensor.env-temp.sem}"
+	local RESULT_FILE="${2:-/tmp/sensor.env-temp.result}"
+	local SLEEP_COUNT="${3:-60}"
+
+    if sensor::envTempSensorPresent; then
+
+		# Signal the watcher to stop by creating the stop file
+
+		touch "$SEM"
+
+
+		# wait for result file
+
+		while [[ $SLEEP_COUNT -gt 0 ]]; do
+			if [[ -f "$RESULT_FILE" ]]; then SLEEP_COUNT=0
+			else
+				sleep 1
+				((SLEEP_COUNT--))
+			fi
+
+		done
+
+
+		# return result
+
+		if [[ -f "$RESULT_FILE" ]]; then
+			cat "$RESULT_FILE"
+			rm "$RESULT_FILE"
+		fi
+
+	else
+
+		echo "N/A"
+
+	fi
+
+}

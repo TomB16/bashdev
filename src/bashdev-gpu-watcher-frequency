@@ -21,21 +21,21 @@
 #
 
 
-source bashdev-cpu
+source bashdev-gpu
 
 
 # parameters
 
-WATCHER_INTERVAL="${1:-5}"  # Default to 5 seconds
-WATCHER_SEM="${2:-/tmp/bashdev.cpu.temp.sem}"
-WATCHER_RESULT_FILE="${3:-/tmp/cpu.temp.result}" 
+WATCHER_INTERVAL="${1:-10}"  # Default to 10 seconds
+WATCHER_SEM="${2:-/tmp/bashdev.gpu.freq.sem}"
+WATCHER_RESULT_FILE="${3:-/tmp/gpu.freq.result}"
 
 
 # running totals
 
 SAMPLES=0
 SAMPLES_MAX=$(( (4 * 60 * 60) / WATCHER_INTERVAL ))		# four hour limit on taking samples to prevent runaway process from running forever
-TEMP_TOTAL=0
+FREQ_TOTAL=0
 
 
 # debug
@@ -51,12 +51,12 @@ while [[ ! -f "$WATCHER_SEM" ]]; do
 
     # read the current CPU frequency in MHz
 
-    TEMP=$(cpu::temperatureGet)
+    FREQ_MHZ=$(gpu::frequencyGet)
 
 
 	# running totals
 
-    TEMP_TOTAL=$(echo "$TEMP_TOTAL + $TEMP" | bc -l)
+    FREQ_TOTAL=$(echo "$FREQ_TOTAL + $FREQ_MHZ" | bc -l)
     SAMPLES=$((SAMPLES + 1))
 
 
@@ -79,8 +79,8 @@ done
 # save result for hand-off
 
 if (( SAMPLES > 0 )); then
-    TEMP_AVE=$(echo "$TEMP_TOTAL / $SAMPLES" | bc -l)
-	printf "%.2f" "$TEMP_AVE" > "$WATCHER_RESULT_FILE"
+    FREQ_AVE=$(echo "$FREQ_TOTAL / $SAMPLES" | bc -l)
+	printf "%.2f" "$FREQ_AVE" > "$WATCHER_RESULT_FILE"
 else
     echo "N/A" >> $WATCHER_RESULT_FILE
 fi

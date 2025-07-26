@@ -1,16 +1,33 @@
 #!/bin/bash
 
-# bashkit-cpu-watcher-frequency
-# Usage: bashkit-cpu-watcher-frequency [interval_seconds] [semaphore_file] [result_file]
-# Monitors CPU frequency and outputs the average when stopped by touching /tmp/bashkit.cpu.sem
+#
+# bashdev - BASH general purpose libraries
+# Copyright (C) 2025 Tom Brown
+#
+# This file is part of bashdev
+#
+# bashdev is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# bashdev is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with bashdev.  If not, see <https://www.gnu.org/licenses/>.
+#
 
-source bashkit-cpu
+
+source bashdev-cpu
 
 
 # parameters
 
 WATCHER_INTERVAL="${1:-5}"  # Default to 5 seconds
-WATCHER_SEM="${2:-/tmp/bashkit.cpu.freq.sem}" 
+WATCHER_SEM="${2:-/tmp/bashdev.cpu.freq.sem}"
 WATCHER_RESULT_FILE="${3:-/tmp/cpu.freq.result}" 
 
 
@@ -34,7 +51,7 @@ while [[ ! -f "$WATCHER_SEM" ]]; do
 
     # read the current CPU frequency in MHz
 
-    FREQ_MHZ=$(cpu::frequency_get)
+    FREQ_MHZ=$(cpu::frequencyGet)
 
 
 	# running totals
@@ -48,9 +65,13 @@ while [[ ! -f "$WATCHER_SEM" ]]; do
 	if [ "$SAMPLES" -ge "$SAMPLES_MAX" ]; then 	touch "$WATCHER_SEM"; 	fi
 
 
-	# interval delay
+    # Sleep, but exit early if semaphore is created
 
-    sleep "$WATCHER_INTERVAL"
+    if command -v inotifywait >/dev/null 2>&1; then
+        timeout "$WATCHER_INTERVAL" inotifywait --include "$WATCHER_SEM" -e create -q /tmp > /dev/null 2>&1
+    else
+        sleep "$WATCHER_INTERVAL"
+    fi
 
 done
 
@@ -61,7 +82,7 @@ if (( SAMPLES > 0 )); then
     FREQ_AVE=$(echo "$FREQ_TOTAL / $SAMPLES" | bc -l)
 	printf "%.2f" "$FREQ_AVE" > "$WATCHER_RESULT_FILE"
 else
-    echo "FREQ not collected." >> $WATCHER_RESULT_FILE
+    echo "N/A" >> $WATCHER_RESULT_FILE
 fi
 
 

@@ -1,0 +1,216 @@
+#!/bin/bash
+
+#
+# bashdev - BASH general purpose libraries
+# Copyright (C) 2025 Tom Brown
+#
+# This file is part of bashdev
+#
+# bashdev is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# bashdev is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with bashdev.  If not, see <https://www.gnu.org/licenses/>.
+#
+
+
+# Guard against multiple inclusion
+
+[[ -n "${__BASHDEV_GPU_SH__}" ]] && return ; readonly __BASHDEV_GPU_SH__=1
+
+
+gpu::brandGet() {
+
+	local BRAND="Unknown"
+
+
+	if lspci | grep -qi 'nvidia'; then
+        BRAND="nVidia"
+    elif lspci | grep -qi 'amd\|ati'; then
+        BRAND="AMD"
+    elif lspci | grep -qi 'intel'; then
+        BRAND="Intel"
+    fi
+
+    echo $BRAND
+
+}
+
+
+gpu::modelGet() {
+
+	local BRAND=$(gpu::brandGet)
+	local MODEL="N/A"
+
+	if   [ "$BRAND" == "AMD" ];    then MODEL=$(lspci | grep -i 'vga\|3d' | grep -i 'amd' | sed 's/^[^:]*: //' | sed 's/^.*controller: //I')
+	elif [ "$BRAND" == "nVidia" ]; then MODEL=$(nvidia-smi --query-gpu=name --format=csv,noheader,nounits 2>/dev/null)
+	elif [ "$BRAND" == "Intel" ];  then MODEL=$(lspci | grep -i 'vga\|3d' | grep -i 'intel' | sed 's/^[^:]*: //' | sed 's/^.*controller: //I')
+	fi
+
+	echo "$MODEL"
+
+}
+
+
+gpu::supportEncodeHEVC() {
+
+	# definitions
+
+	local RESULT="false"
+	local ENCODERS
+
+
+	# Check for known hardware HEVC encoders (AMF, NVENC, VAAPI, QSV)
+
+	ENCODERS=$(ffmpeg -hide_banner -encoders 2>/dev/null)
+
+	grep -qE '^\s+[V\.]+ hevc_(amf|nvenc|vaapi|qsv)\b' <<< "$ENCODERS"
+
+}
+
+
+gpu::frequencyGet() {
+  local BRAND=$(gpu::brandGet)
+  local CLOCK="N/A"
+
+  if   [ "$BRAND" == "AMD"    ]; then CLOCK=$(sensors | awk '/amdgpu/,/^$/' | awk '/sclk:/ { print $2 }')
+  elif [ "$BRAND" == "nVidia" ]; then CLOCK=$(nvidia-smi --query-gpu=clocks.current.graphics --format=csv,noheader,nounits 2>/dev/null)
+  elif [ "$BRAND" == "Intel"  ]; then CLOCK=$(cat /sys/class/drm/card0/gt_cur_freq_mhz 2>/dev/null)
+  fi
+
+  echo "$CLOCK"
+
+}
+
+
+gpu::temperatureGet() {
+
+	local BRAND=$(gpu::brandGet)
+	local TEMP="N/A"
+
+	if   [ "$BRAND" == "AMD" 	]; then TEMP=$(sensors | awk '/amdgpu/,/^$/' | awk '/edge:/ { print $2 }' | tr -d '+°C')
+	elif [ "$BRAND" == "nVidia" ]; then TEMP=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits 2>/dev/null)
+	elif [ "$BRAND" == "Intel"  ]; then TEMP=$(sensors | awk '/i915/,/Adapter/ { if ($1 == "temp1:") print $2 }' | tr -d '+°C')
+	fi
+
+
+	echo "$TEMP"
+
+}
+
+# launch the gpu temp watcher
+
+gpu::temperatureWatcherStart() {
+
+	# parameters
+
+    local INTERVAL="${1:-10}"  # Default to 10 seconds
+	local SEM="${2:-/tmp/gpu.temp.sem}"
+	local RESULT_FILE="${3:-/tmp/gpu.temp.result}"
+
+
+    # Make sure the stop file doesn't exist
+
+	rm -f "$SEM"
+
+
+    # Start the watcher in the background
+
+    bashdev-gpu-watcher-temperature "$INTERVAL" "$SEM" "$RESULT_FILE" &
+    local pid=$!
+
+}
+
+
+# Signal the GPU frequency watcher to stop
+
+gpu::temperatureWatcherStop() {
+
+	# parameters
+
+	local SEM="${1:-/tmp/gpu.temp.sem}"
+	local RESULT_FILE="${2:-/tmp/gpu.temp.result}"
+
+
+    # Signal the watcher to stop by creating the stop file
+
+    touch "$SEM"
+
+
+	# wait for result file
+
+	sleep_count=10
+	while [[ sleep_count -gt 0 ]]; do
+		if [[ -f "$RESULT_FILE" ]]; then sleep_count=0;		fi
+		sleep 1
+		sleep_count=$((sleep_count - 1))
+	done
+
+
+	# return result
+
+	cat "$RESULT_FILE"; rm "$RESULT_FILE"
+
+}
+
+
+
+# Start the GPU frequency watcher in the background
+
+gpu::frequencyWatcherStart() {
+
+	# parameters
+
+    local INTERVAL="${1:-10}"  # Default to 5 seconds
+	local SEM="${2:-/tmp/gpu.freq.sem}"
+	local RESULT_FILE="${3:-/tmp/gpu.freq.result}"
+
+
+    # Make sure the stop file doesn't exist
+
+	rm -f "$SEM"
+
+    # Start the watcher in the background
+
+    bashdev-gpu-watcher-frequency "$INTERVAL" "$SEM" "$RESULT_FILE" &
+    local pid=$!
+
+}
+
+
+# Signal the GPU frequency watcher to stop
+gpu::frequencyWatcherStop() {
+
+	# parameters
+
+	local SEM="${1:-/tmp/gpu.freq.sem}"
+	local RESULT_FILE="${2:-/tmp/gpu.freq.result}"
+
+
+    # Signal the watcher to stop by creating the stop file
+
+    touch "$SEM"
+
+
+	# wait for result file
+
+	sleep_count=10
+	while [[ sleep_count -gt 0 ]]; do
+		if [[ -f "$RESULT_FILE" ]]; then sleep_count=0;		fi
+		sleep 1
+		sleep_count=$((sleep_count - 1))
+	done
+
+
+	# return result
+
+	cat "$RESULT_FILE"; rm "$RESULT_FILE"
+
+}

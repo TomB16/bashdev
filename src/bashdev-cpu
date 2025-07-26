@@ -1,22 +1,138 @@
 #!/bin/bash
 
+#
+# bashdev - BASH general purpose libraries
+# Copyright (C) 2025 Tom Brown
+#
+# This file is part of bashdev
+#
+# bashdev is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# bashdev is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with bashdev.  If not, see <https://www.gnu.org/licenses/>.
+#
 
-# get cpu model
 
-cpu::model_get() {
+# Guard against multiple inclusion
 
-	cpu_model=$(grep -m1 "model name" /proc/cpuinfo | cut -d ':' -f2 | xargs)
+[[ -n "${__BASHDEV_CPU_SH__}" ]] && return ; readonly __BASHDEV_CPU_SH__=1
 
-	echo "$cpu_model"
+
+cpu::brandGet() {
+
+    # fetch the CPU string
+
+    CPU_STRING=$(grep -m1 "model name" /proc/cpuinfo | cut -d: -f2- | sed 's/^ *//')
+
+    # Extract CPU brand
+
+    if [[ "$CPU_STRING" == AMD* ]]; then
+        CPU_BRAND="AMD"
+    elif [[ "$CPU_STRING" == Intel* ]]; then
+        CPU_BRAND="Intel"
+    else
+        CPU_BRAND="Unknown"
+    fi
+
+    echo $CPU_BRAND
 
 }
 
 
+cpu::modelGet() {
+
+    # fetch the CPU string
+
+    CPU_STRING=$(grep -m1 "model name" /proc/cpuinfo | cut -d: -f2- | sed 's/^ *//')
+
+    # Extract CPU brand
+    if [[ "$CPU_STRING" == AMD* ]]; then
+        CPU_BRAND="AMD"
+    elif [[ "$CPU_STRING" == Intel* ]]; then
+        CPU_BRAND="Intel"
+    else
+        CPU_BRAND="Unknown"
+    fi
+
+    # Extract CPU model (basic logic for AMD and Intel)
+    if [[ "$CPU_BRAND" == "AMD" ]]; then
+        # Extract word that looks like 9700X, 5950X, etc.
+        CPU_MODEL=$(echo "$CPU_STRING" | grep -oP '\b[1-9][0-9]{3,5}[A-Z]?\b')
+    elif [[ "$CPU_BRAND" == "Intel" ]]; then
+        # Intel model usually comes after "i3", "i5", "i7", or "i9"
+        CPU_MODEL=$(echo "$CPU_STRING" | grep -oP 'i[3579]-\K[0-9A-Z]+')
+    else
+        CPU_MODEL="Unknown"
+    fi
+
+    echo "$CPU_MODEL"
+
+}
+
+
+cpu::coreCount() { lscpu | grep "^Core(s) per socket:" | awk '{print $4}';  }
+
+cpu::boostClockGet() { lscpu | awk '/CPU max MHz/ { print int($4) }'; }
+
+
+cpu::isNearMaxBoostClock() {
+
+    local FREQ_CURRENT=$( cpu::frequencyGet )
+    local FREQ="${1:-$FREQ_CURRENT}"
+	local RATIO="${2:-90}"
+
+	local FREQ_INT=$(awk -v f="$FREQ" 'BEGIN { printf "%.0f", f }')
+    local THRESHOLD=$(( BOOST_CLOCK * RATIO / 100 ))
+
+    if (( FREQ_INT >= THRESHOLD )); then
+        echo "true"
+        return 0  # true
+    else
+        echo "false"
+        return 1  # false
+    fi
+
+}
+
+
+cpu::supportAVX512() {
+
+    RESULT=false
+    if grep -m1 -q 'avx512f' /proc/cpuinfo; then    RESULT=true;      fi
+    echo $RESULT
+
+}
+
+
+cpu::supportAVX2() {
+
+    RESULT=false
+    if grep -m1 -q 'avx2' /proc/cpuinfo; then    RESULT=true;      fi
+    echo $RESULT
+
+}
+
+
+cpu::supportSSE4_1() {
+
+    RESULT=false
+    if grep -m1 -q 'sse4_1' /proc/cpuinfo; then    RESULT=true;      fi
+    echo $RESULT
+
+}
 
 
 # Function to get a single CPU frequency sample from the first CPU core found (in kHz)
 
-cpu::frequency_get() {
+cpu::frequencyGet() {
     local cpuinfo_file="/proc/cpuinfo"
     if [[ -f $cpuinfo_file ]]; then
         # Average cpu MHz across all cores, converted to kHz (integer)
@@ -29,7 +145,7 @@ cpu::frequency_get() {
 
 # Start the CPU frequency watcher in the background
 
-cpu::frequency_watcher_start() {
+cpu::frequencyWatcherStart() {
 
 	# parameters
 
@@ -44,14 +160,14 @@ cpu::frequency_watcher_start() {
 
     # Start the watcher in the background
 
-    bashkit-cpu-watcher-frequency "$INTERVAL" "$SEM" "$RESULT_FILE" &
+    bashdev-cpu-watcher-frequency "$INTERVAL" "$SEM" "$RESULT_FILE" &
     local pid=$!
 
 }
 
 
 # Signal the CPU frequency watcher to stop
-cpu::frequency_watcher_stop() {
+cpu::frequencyWatcherStop() {
 
 	# parameters
 
@@ -76,14 +192,14 @@ cpu::frequency_watcher_stop() {
 
 	# return result
 
-	cat "$RESULT_FILE"
+	cat "$RESULT_FILE"; rm "$RESULT_FILE"
 
 }
 
 
 # Function to get a single CPU temperature sample (°C)
 
-cpu::temperature_get() {
+cpu::temperatureGet() {
     local hwmon_dir temp_file temp_val
 
     for hwmon_dir in /sys/class/hwmon/hwmon*; do
@@ -104,7 +220,7 @@ cpu::temperature_get() {
 
 # launch the cpu temp watcher
 
-cpu::temperature_watcher_start() {
+cpu::temperatureWatcherStart() {
 
 	# parameters
 
@@ -120,7 +236,7 @@ cpu::temperature_watcher_start() {
 
     # Start the watcher in the background
 
-    bashkit-cpu-watcher-temperature "$INTERVAL" "$SEM" "$RESULT_FILE" &
+    bashdev-cpu-watcher-temperature "$INTERVAL" "$SEM" "$RESULT_FILE" &
     local pid=$!
 
 }
@@ -128,7 +244,7 @@ cpu::temperature_watcher_start() {
 
 # Signal the CPU frequency watcher to stop
 
-cpu::temperature_watcher_stop() {
+cpu::temperatureWatcherStop() {
 
 	# parameters
 
@@ -153,14 +269,14 @@ cpu::temperature_watcher_stop() {
 
 	# return result
 
-	cat "$RESULT_FILE"
+	cat "$RESULT_FILE"; rm "$RESULT_FILE"
 
 }
 
 
 # Function to get a single CPU temperature sample (°C)
 
-cpu::get_temperature() {
+cpu::temperatureGet() {
     local hwmon_dir temp_file temp_val
 
     for hwmon_dir in /sys/class/hwmon/hwmon*; do
@@ -178,3 +294,80 @@ cpu::get_temperature() {
     echo 0
 }
 
+
+cpu::supportPowerMonitor() {
+    local RESULT=1  # default to false
+
+    # Check for RAPL power info via sysfs (common on Intel/AMD)
+    if [[ -d "/sys/class/powercap/intel-rapl" ]] || [[ -d "/sys/class/powercap/amd-rapl" ]]; then
+        # Check if powerstat is installed
+        if command -v powerstat &>/dev/null; then
+            RESULT=0
+        fi
+    fi
+
+    return "$RESULT"
+}
+
+
+# Start the CPU frequency watcher in the background
+
+# Global variable declaration
+CPU_POWERSTAT_PID=
+CPU_POWERSTAT_RESULT_FILE=
+
+cpu::powerWatcherStart() {
+
+    CPU_POWERSTAT_RESULT_FILE="${3:-/tmp/powerstat.result}"
+
+    # Check if powerstat is installed
+
+    if command -v powerstat &>/dev/null; then
+        # parameters
+
+        local INTERVAL="${1:-5}"  # Default to 5 seconds
+        local DURATION="${2:-1440}"  # Default to 4 cpu::powerWatcherStart() duration is $DURATION"
+        [[ "$DEBUG" == "true" ]] && echo "debug: cpu::powerWatcherStart() DURATION is $DURATION"
+
+        powerstat -d 2 -R "$INTERVAL" "$DURATION" > "$CPU_POWERSTAT_RESULT_FILE" &
+        CPU_POWERSTAT_PID=$!
+
+        [[ "$DEBUG" == "true" ]] && echo "debug: cpu::powerWatcherStart() CPU_POWERSTAT_PID is $CPU_POWERSTAT_PID"
+    else
+        CPU_POWERSTAT_PID=""
+    fi
+
+}
+
+
+# Signal the CPU frequency watcher to stop
+
+cpu::powerWatcherStop() {
+
+    local RESULT="N/A"
+
+
+	# parameters
+
+    if [[ -n "$CPU_POWERSTAT_PID" ]]; then
+        kill -2 "$CPU_POWERSTAT_PID" 2>/dev/null
+        wait "$CPU_POWERSTAT_PID" 2>/dev/null
+        CPU_POWERSTAT_PID=
+
+        for i in {1..10}; do
+            if [[ -s "$CPU_POWERSTAT_RESULT_FILE" ]]; then
+                sleep 5s
+                RESULT=$(awk '/^ Average/ { print $NF }' "$CPU_POWERSTAT_RESULT_FILE")
+                [ -z "$RESULT" ] && RESULT="N/A"
+                break
+            fi
+            sleep 0.1
+        done
+
+        #[[ -f "$CPU_POWERSTAT_RESULT_FILE" ]] && rm "$CPU_POWERSTAT_RESULT_FILE"
+
+    fi
+
+
+    echo "$RESULT"
+}

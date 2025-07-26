@@ -1,0 +1,90 @@
+#!/bin/bash
+
+#
+# bashdev - BASH general purpose libraries
+# Copyright (C) 2025 Tom Brown
+#
+# This file is part of bashdev
+#
+# bashdev is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# bashdev is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with bashdev.  If not, see <https://www.gnu.org/licenses/>.
+#
+
+
+source bashdev-sensor
+
+
+# Parameters
+
+WATCHER_INTERVAL="${1:-5}"
+WATCHER_SEM="${2:-/tmp/bashdev.sensor.env.temp.sem}"
+WATCHER_RESULT_FILE="${3:-/tmp/env.temp.result}"
+WATCHER_TIMEOUT="${4:-14400}"  # Default 4 hours in seconds
+
+# State
+WATCHER_SAMPLES=0
+TEMP_TOTAL=0
+
+# Start time
+START_TIME=$(date +%s)
+
+# Fast exit on existing semaphore (maybe stale)
+if [[ -f "$WATCHER_SEM" ]]; then
+    echo "Semaphore file already exists. Exiting." >&2
+    exit 1
+fi
+
+# Main loop
+while true; do
+    # Exit if semaphore file exists
+    if [[ -f "$WATCHER_SEM" ]]; then
+        break
+    fi
+
+    # Check for timeout
+
+    NOW=$(date +%s)
+    ELAPSED=$((NOW - START_TIME))
+    if (( ELAPSED >= WATCHER_TIMEOUT )); then
+        echo "Timeout reached after $ELAPSED seconds. Stopping." >&2
+        touch "$WATCHER_SEM"
+        break
+    fi
+
+    # Read current temperature
+
+    TEMP=$(sensor::envTempGet)
+    TEMP_TOTAL=$(echo "$TEMP_TOTAL + $TEMP" | bc -l)
+    WATCHER_SAMPLES=$((WATCHER_SAMPLES + 1))
+
+
+    # Sleep, but exit early if semaphore is created
+
+    if command -v inotifywait >/dev/null 2>&1; then
+        timeout "$WATCHER_INTERVAL" inotifywait --include "$WATCHER_SEM" -e create -q /tmp > /dev/null 2>&1
+    else
+        sleep "$WATCHER_INTERVAL"
+    fi
+
+done
+
+# Write result
+if (( WATCHER_SAMPLES > 0 )); then
+    TEMP_AVE=$(echo "$TEMP_TOTAL / $WATCHER_SAMPLES" | bc -l)
+    printf "%.2f\n" "$TEMP_AVE" > "$WATCHER_RESULT_FILE"
+else
+    echo "N/A" > "$WATCHER_RESULT_FILE"
+fi
+
+# Clean up
+rm -f "$WATCHER_SEM"

@@ -21,28 +21,27 @@
 #
 
 
-# Guard against multiple inclusion
+source ./bashdev-app
 
-[[ -n "${__BASHDEV_FILE_SH__}" ]] && return ; readonly __BASHDEV_FILE_SH__=1
+APP_NAME=$(basename "$0")
+APP_VERSION="0.0.1"
+APP_AUTHOR="Tom Brown"
+APP_YEAR="2025"
+APP_LICENSE="MIT"
+APP_DESC="bashdev-app library test bed and sample code"
+
+app::masthead "$APP_NAME" "$APP_VERSION" "$APP_AUTHOR" "$APP_YEAR" "$APP_LICENSE" "$APP_DESC"
+
+DEBUG=false
+
+# process lock
+
+app::processLockSpin $(basename "$0") 500 2 10
+
+echo "sleep 5s"
+sleep 20
 
 
-# clean old files
+# release the lock on and remove lock file the way out
 
-file::cleanOldFiles() {
-
-    local path="$1"
-    local age="${2:-360}"
-
-    if [[ -z "$path" ]]; then
-        echo "Usage: file::clean_old_files <path> [age in days]" >&2
-        return 1
-    fi
-
-    if [[ ! -d "$path" ]]; then
-        echo "error: '$path' is not a valid directory." >&2
-        return 2
-    fi
-
-    [ "$DEBUG" ] && echo "debug: cleaning files older than $age days in $path"
-    find "$path" -type f -mtime "+$age" -print -delete
-}
+app::processUnlock

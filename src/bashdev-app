@@ -1,0 +1,202 @@
+#!/bin/bash
+
+#
+# bashdev - BASH general purpose libraries
+# Copyright (C) 2025 Tom Brown
+#
+# This file is part of bashdev
+#
+# bashdev is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# bashdev is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with bashdev.  If not, see <https://www.gnu.org/licenses/>.
+#
+
+
+# Guard against multiple inclusion
+
+[[ -n "${__BASHDEV_APP_SH__}" ]] && return ; readonly __BASHDEV_APP_SH__=1
+
+
+# app::masthead "$APP_NAME" "$APP_VERSION" "$APP_AUTHOR" "$APP_LICENSE" "$APP_DESC"
+
+
+app::masthead() {
+
+    local APP_NAME=${1:-"N/A"}
+    local APP_VER=${2:-"N/A"}
+    local APP_AUTHOR=${3:-"Tom Brown"}
+    local APP_YEAR=${4:-"N/A"}
+    local APP_LICENSE=${5:-"MIT"}
+    local APP_DESC=${6:-"N/A"}
+
+
+    echo "$APP_NAME  v$APP_VER"
+    echo "$APP_DESC"
+    echo
+    echo "(c) $APP_YEAR $APP_AUTHOR - $APP_LICENSE license"
+    echo
+
+}
+
+
+PROCESS_LOCK_NUM=0
+PROCESS_LOCK_FILE=""
+
+app::processLock() {
+
+    PROCESS_LOCK_NAME=${1?Process name required}
+    local PROCESS_NUM=${2:-500}
+    local LOCK_COUNT=${3:-1}
+
+
+    # look for open lock slot
+
+    for (( i=PROCESS_NUM; i < PROCESS_NUM + LOCK_COUNT; i++ )); do
+        PROCESS_LOCK_FILE="/tmp/$PROCESS_LOCK_NAME.${i}.lock"
+        if eval "exec ${i}>\"$PROCESS_LOCK_FILE\""; then
+            if flock -n "$i"; then
+                [[ "$DEBUG" == "true" ]] && echo "debug: process locked on file $PROCESS_LOCK_FILE"
+                PROCESS_LOCK_NUM=$i
+                break;
+            else
+                [[ "$DEBUG" == "true" ]] && echo "debug: lock failed on $PROCESS_LOCK_FILE"
+            fi
+        else
+            [[ "$DEBUG" == "true" ]] && echo "debug: exec failed on $PROCESS_LOCK_FILE"
+        fi
+    done
+
+    # lock mechanics
+
+    if [ "$PROCESS_LOCK_NUM" -eq "0" ]; then
+        echo "fatal: process lock failed"
+		exit 1
+    fi
+
+
+    return 0
+}
+
+
+app::processLockSpinBack() {
+
+    PROCESS_LOCK_NAME=${1?Process name required}
+    local PROCESS_NUM=${2:-500}
+    PROCESS_LOCK_COUNT=${3:-1}
+    local TIMEOUT=${4-300}
+
+
+    # lock filename
+
+    if [ -n "$LOCK_NAME" ]; then LOCK="/tmp/$LOCK_NAME.lock"
+                            else LOCK="/tmp/bashdev.lock"
+    fi
+
+
+	# loop until process lock aquired
+
+	local SPIN=true
+	local START=$SECONDS
+	local END=$(( START + TIMEOUT ))
+    local DELAY=1
+
+	while [[ "$SPIN" == "true" && $SECONDS -lt $END ]]; do
+
+        if [ -f $LOCK ]; then
+
+			# echo "info:  waiting for seralized execution"
+			DELAY=$(( (RANDOM % 3) + 1 ))
+			sleep $DELAY
+
+        else
+
+            eval "exec ${PROCESS_NUM}>\"$LOCK\""
+            if flock -n "$PROCESS_NUM"; then
+                [[ "$DEBUG" == "true" ]] && echo "debug: process lock aquired"
+                SPIN=false
+            fi
+
+		fi
+
+	done
+
+
+	# check for timeout
+
+    if [[ $SECONDS -ge $END ]]; then
+			echo "error:  process lock timeout"
+			exit 1
+    fi
+
+
+    return 0
+}
+
+
+app::processLockSpin() {
+
+    local LOCK_NAME=${1?Process name required}
+    local BASE_NUM=${2-500}
+    local SLOT_COUNT=${3:-1}
+    local TIMEOUT=${4-300}
+
+
+	# loop until process lock aquired
+
+	local SPIN=true
+	local START=$SECONDS
+	local END=$(( START + TIMEOUT ))
+    local DELAY=1
+
+    while [[ "$SPIN" == "true" && $SECONDS -lt $END ]]; do
+
+        for (( i=BASE_NUM; i < BASE_NUM + SLOT_COUNT; i++ )); do
+
+            PROCESS_LOCK_FILE="/tmp/$LOCK_NAME.${i}.lock"
+            eval "exec ${i}>\"$PROCESS_LOCK_FILE\""
+
+            if flock -n "$i"; then
+                [[ "$DEBUG" == "true" ]] && echo "debug: process lock acquired on $PROCESS_LOCK_FILE"
+                PROCESS_LOCK_NUM=$i
+                SPIN=false
+                break
+            fi
+
+        done
+
+        if [[ "$SPIN" == "true" ]]; then
+            DELAY=$(( (RANDOM % 3) + 1 ))
+            sleep $DELAY
+        fi
+
+    done
+
+	# check for timeout
+
+    if [[ $SECONDS -ge $END ]]; then
+			echo "error:  process spin lock timeout"
+			exit 1
+    fi
+
+
+    return 0
+}
+
+app::processUnlock() {
+
+    exec {PROCESS_LOCK_NUM}>&-
+    if [ -f $PROCESS_LOCK_FILE ]; then
+        rm "$PROCESS_LOCK_FILE"
+        [[ $DEBUG == "true" ]]		&& echo >&2 "debug: Process lock $PROCESS_LOCK_FILE withdrawn"
+    fi
+
+}

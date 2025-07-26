@@ -1,7 +1,59 @@
 #!/bin/bash
 
-source bashkit-string
+#
+# bashdev - BASH general purpose libraries
+# Copyright (C) 2025 Tom Brown
+#
+# This file is part of bashdev
+#
+# bashdev is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# bashdev is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with bashdev.  If not, see <https://www.gnu.org/licenses/>.
+#
 
 
-echo "info: CPU detected - $(string::strip_quotes "[this is a test]" )"
+source ./bashdev-cpu
+
+
+echo "info:  CPU brand             $(cpu::brandGet)"
+echo "info:  CPU model             $(cpu::modelGet)"
+echo "info:  CPU core count        $(cpu::coreCount)"
+echo "info:  max boost clock       $(cpu::boostClockGet)"
+echo "info:  near max boost clock  $(cpu::isNearMaxBoostClock)"
+
+echo "info:  CPU frequency         $(cpu::frequencyGet)"
+echo "info:  CPU temperature       $(cpu::temperatureGet)"
+
+echo "info:  AVX512 support        $(cpu::supportAVX512)"
+echo "info:  AVX2 support          $(cpu::supportAVX2)"
+
+echo "info:  Power monitor support $(cpu::supportPowerMonitor && echo true || echo false)"
+
+
+# monitor frequency and return average
+
+DEBUG=true
+
+DURATION=6
+echo "starting frequency/temperature/power monitor $DURATION seconds ..."
+
+cpu::frequencyWatcherStart 2
+cpu::temperatureWatcherStart 2
+cpu::powerWatcherStart
+
+sleep "$DURATION"
+
+echo "Average power       $(cpu::powerWatcherStop)"
+echo "Average frequency   $(cpu::frequencyWatcherStop)"
+echo "Average temperature $(cpu::temperatureWatcherStop)"
+
 
